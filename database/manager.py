@@ -58,3 +58,36 @@ class BangerWaveDatabase:
                 return True
         except sqlite3.IntegrityError:
             return False
+
+    def add_track_to_playlist(self,playlist_id: int,track_data:dict) -> bool:
+       """Safely caches song and maps it to a playlist via our junction table. 
+          Prevent table duplication and thread-clapping using single context blocks. 
+       """ 
+       try: 
+           with self._get_connection() as conn: 
+               cursor = conn.cursor() 
+
+               # Step 1:Cache the track metadata safely; ignore if it alreafy exists 
+               cursor.execute("""INSERT OR IGNORE INTO tracks (search_query,name,duration)
+                              VALUES (?,?,?)
+               """, (track_data["query"], track_data["title"],track_data["duration"]))
+
+               # Step 2: Grab the unique primary key ID of that cached  track record 
+               cursor.execute("SELECT id FROM  tracks WHERE search_query = ?",(track_data["query"],)) 
+               row = cursor.fetchone() 
+               if not row: 
+                   return False 
+               track_id = row["id"] 
+
+               # Step 3: Insert the mapping into our composite junction table
+               cursor.execute("""
+                   INSERT OR IGNORE INTO playlist_tracks (playlist_id,track_id)
+                   VALUES (?, ?)
+                 """, (playlist_id, track_id)) 
+               
+                #SQLite auto-commits upon successful exit of this context scope block     
+               print(f"[DATA SUCCESS] Mapped Track ID {track_id} to Playlist ID {playlist_id}") 
+               return True
+       except sqlite3.Error as e:
+            print(f"[DATA ERROR] Relational insertion failure: {e}") 
+            return False  

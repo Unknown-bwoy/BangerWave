@@ -135,8 +135,7 @@ class BangerWaveLayout:
                 self.play_button.icon = ft.Icons.PAUSE_CIRCLE_FILLED_ROUNDED
             else:
                 self.play_button.icon = ft.Icons.PLAY_CIRCLE_FILLED_ROUNDED
-        self.volume_slider.value = self.state.volume * 100
+       
         self.page.update() 
 
 
-#TO Do i will try to figure out why the vol bar os not working smoothly or moving smoothly and continue to fix any bugs

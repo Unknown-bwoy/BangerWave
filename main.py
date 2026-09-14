@@ -2,6 +2,7 @@ from flet.app import app
 from flet.controls.page import Page
 
 from core.state import AppState
+
 from core.audio_worker import AudioWorker
 from database.manager import BangerWaveDatabase
 from ui.layout import BangerWaveLayout
