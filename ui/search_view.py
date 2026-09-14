@@ -24,7 +24,7 @@ class BangerWaveSearchView:
             expand=True,
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
-            on_submit=lambda e: self.page.run_task(self.execute_search)
+            on_submit=lambda e: self.page.run_task(self.execute_search,e)
         )
 
     async def execute_search(self, e):
@@ -84,7 +84,7 @@ class BangerWaveSearchView:
             controls=[
                 ft.Row([
                     self.search_box, 
-                    ft.ElevatedButton("Search", on_click=lambda e: self.page.run_task(self.execute_search))
+                    ft.ElevatedButton("Search", on_click=lambda e: self.page.run_task(self.execute_search,e))
                 ]),
                 ft.Container(content=self.results_list, expand=True)
             ],
