@@ -44,6 +44,14 @@ class BangerWaveSearchView:
         track_data = await self.worker.resolve_stream(query_text)
         self.results_list.controls.clear()
 
+       # (Assuming your database manager instance is passed down via Dependency Injection as self.db) 
+        playlists = [] 
+        if hasattr(self, 'db') and self.db: 
+           playlists = self.db.get_all_playlists() 
+        else: 
+            # Fallback mock for testing if db injection is not wired yet 
+            playlists = [{"id": 1,"name":"Favorites"}, {"id": 2, "name":"Fun Vibes"}]   
+           
         if track_data:
             # 3. Construct an immaculate Spotify-style track record display card component
             track_card = ft.Container(
@@ -87,7 +95,10 @@ class BangerWaveSearchView:
                     ft.ElevatedButton("Search", on_click=lambda e: self.page.run_task(self.execute_search,e))
                 ]),
                 ft.Container(content=self.results_list, expand=True)
+            
+
             ],
             expand=True
         )
 
+           

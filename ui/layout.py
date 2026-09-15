@@ -139,3 +139,4 @@ class BangerWaveLayout:
         self.page.update() 
 
 
+#TO Do i will try to figure where each syntax is supposed to be and continue from there
