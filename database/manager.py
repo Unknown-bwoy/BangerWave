@@ -57,7 +57,30 @@ class BangerWaveDatabase:
                 cursor.execute("INSERT INTO playlists (name) VALUES (?)", (playlist_name.strip(),))
                 return True
         except sqlite3.IntegrityError:
-            return False
+            return False 
+
+
+    def get_all_playlists(self) -> list: 
+        """
+        Queries the database and retrieves all saved custom playlist records.
+        Converts sqlite3.Row elements into clean dictionary models for the UI. 
+        """    
+        try: 
+            with self._get_connection() as conn: 
+                cursor = conn.cursor() 
+                #Fetch all rows from the playlists table  sorted by date created 
+                cursor.execute("SELECT * FROM playlists ORDER BY date_created DESC") 
+                rows = cursor.fetchall() 
+
+                #Turn the SQlite row objects into standard python dictionaries 
+                return [dict(row)  for row in rows] 
+
+        except sqlite3.Error as e: 
+            print(f"[DATABASE ERROR] Playlist retrieval failure: {e}") 
+            return []
+
+
+
 
     def add_track_to_playlist(self,playlist_id: int,track_data:dict) -> bool:
        """Safely caches song and maps it to a playlist via our junction table. 
@@ -109,4 +132,6 @@ class BangerWaveDatabase:
                 return [dict(row) for row in cursor.fetchall()] 
         except sqlite3.Error as e: 
             print(f"[DATA ERROR] Playlist retrieval query failure: {e}") 
-            return []
+            return [] 
+
+    
