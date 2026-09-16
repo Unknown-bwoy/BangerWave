@@ -9,11 +9,12 @@ else:
 
 class BangerWaveSearchView:
     """SearchView controller for the BangerWave application viewport."""
-    def __init__(self, page: Any, state: Any, worker: Any):
+    def __init__(self, page: Any, state: Any, worker: Any,db:Any):
         # Inject core system layer pointers safely
         self.page = page
         self.state = state
-        self.worker = worker
+        self.worker = worker 
+        self.db = db
         
         # 1. Initialize an empty scrolling view list for track results
         self.results_list = ft.ListView(expand=True, spacing=10, padding=10)
@@ -51,7 +52,19 @@ class BangerWaveSearchView:
         else: 
             # Fallback mock for testing if db injection is not wired yet 
             playlists = [{"id": 1,"name":"Favorites"}, {"id": 2, "name":"Fun Vibes"}]   
+
+        # Create an array of menu choices linked to database IDs 
+        menu_tems = [
+            ft.PopupMenuItem(
+                text =f"Save to {pl['name']}", 
+                on_click =lambda e, pl_id=pl["id"]: self.save_song_action(pl_id,track_data) 
+
+            ) for pl in playlists
+        ]
            
+        
+
+
         if track_data:
             # 3. Construct an immaculate Spotify-style track record display card component
             track_card = ft.Container(
@@ -67,7 +80,7 @@ class BangerWaveSearchView:
                     ], expand=True),
                     ft.IconButton(
                         icon=ft.Icons.PLAY_ARROW_ROUNDED,
-                        on_click=lambda _: self.inject_and_play(track_data)
+                        on_click=lambda _: self.inject_and_play(track_data),
                     )
                 ]),
                 bgcolor=ft.Colors.SURFACE_CONTAINER,
@@ -101,4 +114,13 @@ class BangerWaveSearchView:
             expand=True
         )
 
-           
+    def save_song_action(self,playlist_id: int,track: Dict[str, Any]): 
+        """Trigggers sequential transaction caching paths to write records"""
+        if hasattr(self,'db') and self.db: 
+            success = self.db.add_track_to_playlist(playlist_id,track) 
+            if success: 
+                print(f"[SAVE SUCCESS] Securely logged '{track['title']}' in playlist ID: {playlist_id}") 
+
+        # Optional visual snackbar confirmation block indicator layout 
+        self.search_box.hint_text = f"Saved: {track['title'][:20]}..." 
+        self.page.update() 

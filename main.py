@@ -15,9 +15,10 @@ def main(page: Page):
     db = BangerWaveDatabase()
 
     # 2. Instantiate and assemble your visual multi-pane window framework
-    layout = BangerWaveLayout(page, state, worker)
+    layout = BangerWaveLayout(page, state, worker,db)
     layout.assemble()
-
+    
+     
     # 3. Defensive cleanup: intercept the page close event and stop the worker safely
     def handle_close(_event):
         print("[SYSTEM TEARDOWN] Cleaning up background engine worker threads...")
