@@ -218,6 +218,8 @@ class BangerWaveLayout:
                         ft.Text(pl["name"], size=13, overflow=ft.TextOverflow.ELLIPSIS) 
 
                     ], spacing=10), 
-                    on_tap =lambda e,pl_id=pl["id"]: print(f"Playlist CLicked ID")
-                )
+                    on_tap =lambda e,pl_id=pl["id"]: print(f"Playlist CLicked ID: {pl_id}")
+
+                         ) 
             )        
+        self.page.update()
