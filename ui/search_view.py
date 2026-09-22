@@ -1,31 +1,27 @@
 # File Name: ui/search_view.py
-from typing import Any, Dict
-
-if __package__:
-    from .flet_compat import ft
-else:
-    from flet_compat import ft
-
+import flet as ft
+from typing import Dict, Any, Optional
 
 class BangerWaveSearchView:
     """SearchView controller for the BangerWave application viewport."""
-    def __init__(self, page: Any, state: Any, worker: Any,db:Any):
-        # Inject core system layer pointers safely
+    
+    def __init__(self, page: Any, state: Any, worker: Any, db: Any):
+        # Store system dependency channels explicitly inside the instance scope
         self.page = page
         self.state = state
-        self.worker = worker 
+        self.worker = worker
         self.db = db
         
-        # 1. Initialize an empty scrolling view list for track results
+        # 1. Initialize an empty scrolling view list layout for tracking search components
         self.results_list = ft.ListView(expand=True, spacing=10, padding=10)
         
-        # 2. Setup your text input search layout control field
+        # 2. Setup text box input field
         self.search_box = ft.TextField(
             hint_text="Search for songs, artists, or genres...",
             expand=True,
             bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
             border_radius=8,
-            on_submit=lambda e: self.page.run_task(self.execute_search,e)
+            on_submit=lambda e: self.page.run_task(self.execute_search, e)
         )
 
     async def execute_search(self, e):
@@ -34,55 +30,61 @@ class BangerWaveSearchView:
         if not query_text:
             return
 
-        # Clear out previous search iterations and present an active loading spinner ring
+        # Empty out old visual tracks cards and post loading feedback spinners
         self.results_list.controls.clear()
         self.results_list.controls.append(
-            ft.Row([ft.ProgressRing(), ft.Text(" Fetching matching track links...")])
+            ft.Row(controls=[ft.ProgressRing(), ft.Text(" Fetching matching track links...")])
         )
         self.page.update()
 
-        # Delegate the blocking network I/O scrape safely onto the worker executor pool
+        # Safely hand the heavy scraping operation over to our isolated thread execution pool
         track_data = await self.worker.resolve_stream(query_text)
         self.results_list.controls.clear()
 
-       # (Assuming your database manager instance is passed down via Dependency Injection as self.db) 
-        playlists = [] 
-        if hasattr(self, 'db') and self.db: 
-           playlists = self.db.get_all_playlists() 
-        else: 
-            # Fallback mock for testing if db injection is not wired yet 
-            playlists = [{"id": 1,"name":"Favorites"}, {"id": 2, "name":"Fun Vibes"}]   
-
-        # Create an array of menu choices linked to database IDs 
-        menu_tems = [
-            ft.PopupMenuItem(
-                text =f"Save to {pl['name']}", 
-                on_click =lambda e, pl_id=pl["id"]: self.save_song_action(pl_id,track_data) 
-
-            ) for pl in playlists
-        ]
-           
-        
-
-
         if track_data:
-            # 3. Construct an immaculate Spotify-style track record display card component
+            # Query the database to populate your popup folder selectors
+            playlists = []
+            if self.db:
+                playlists = self.db.get_all_playlists()
+            
+            # Map saved folder rows to pop up actionable save triggers
+            menu_items = [
+                ft.PopupMenuItem(
+                    text=f"Save to {pl['name']}",
+                    on_click=lambda e, pl_id=pl["id"]: self.save_song_action(pl_id, track_data)
+                ) for pl in playlists
+            ]
+
+            # Construct an immaculate Spotify-style visual tracking result card
             track_card = ft.Container(
-                content=ft.Row([
-                    ft.Icon(ft.Icons.MUSIC_NOTE_ROUNDED, color=ft.Colors.GREEN_ACCENT_400),
-                    ft.Column([
-                        ft.Text(track_data["title"], weight=ft.FontWeight.BOLD),
-                        ft.Text(
-                            value=f"Length: {int(track_data['duration'] // 60)}m {int(track_data['duration'] % 60)}s", 
-                            size=12, 
-                            color=ft.Colors.GREY_400
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.MUSIC_NOTE_ROUNDED, color=ft.Colors.BLUE_ACCENT_400),
+                        ft.Column(
+                            controls=[
+                                ft.Text(track_data["title"], weight=ft.FontWeight.BOLD, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS),
+                                ft.Text(
+                                    value=f"Length: {int(track_data['duration'] // 60)}m {int(track_data['duration'] % 60)}s", 
+                                    size=12, 
+                                    color=ft.Colors.GREY_400
+                                )
+                            ], 
+                            expand=True
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.IconButton(
+                                    icon=ft.Icons.PLAY_ARROW_ROUNDED,
+                                    on_click=lambda _: self.inject_and_play(track_data)
+                                ),
+                                ft.PopupMenuButton(
+                                    icon=ft.Icons.MORE_VERT_ROUNDED,
+                                    items=menu_items
+                                )
+                            ]
                         )
-                    ], expand=True),
-                    ft.IconButton(
-                        icon=ft.Icons.PLAY_ARROW_ROUNDED,
-                        on_click=lambda _: self.inject_and_play(track_data),
-                    )
-                ]),
+                    ]
+                ),
                 bgcolor=ft.Colors.SURFACE_CONTAINER,
                 padding=12,
                 border_radius=8
@@ -94,33 +96,25 @@ class BangerWaveSearchView:
         self.page.update()
 
     def inject_and_play(self, track: Dict[str, Any]):
-        """Injects unexpired HTTP stream links directly into the core app state layer."""
+        """Injects unexpired HTTP stream links directly into the application state matrix."""
         print(f"[PLAYBACK TRIGGER] Initializing network audio stream for: {track['title']}")
-        # Mutates the observer variable state layer to alert visual elements
         self.state.update_track(track)
 
-    def build(self) -> Any:
+    def save_song_action(self, playlist_id: int, track: Dict[str, Any]):
+        """Triggers sequential database transactions to log track records inside SQLite tables."""
+        if self.db:
+            success = self.db.add_track_to_playlist(playlist_id, track)
+            if success:
+                print(f"[SAVE SUCCESS] Securely logged '{track['title']}' inside playlist ID: {playlist_id}")
+                self.search_box.hint_text = f"Saved: {track['title'][:20]}..."
+                self.page.update()
+
+    def build(self) -> ft.Column:
         """Returns the completed search dashboard container column layout view."""
         return ft.Column(
             controls=[
-                ft.Row([
-                    self.search_box, 
-                    ft.ElevatedButton("Search", on_click=lambda e: self.page.run_task(self.execute_search,e))
-                ]),
+                ft.Row(controls=[self.search_box, ft.ElevatedButton("Search", on_click=lambda e: self.page.run_task(self.execute_search, e))]),
                 ft.Container(content=self.results_list, expand=True)
-            
-
             ],
             expand=True
         )
-
-    def save_song_action(self,playlist_id: int,track: Dict[str, Any]): 
-        """Trigggers sequential transaction caching paths to write records"""
-        if hasattr(self,'db') and self.db: 
-            success = self.db.add_track_to_playlist(playlist_id,track) 
-            if success: 
-                print(f"[SAVE SUCCESS] Securely logged '{track['title']}' in playlist ID: {playlist_id}") 
-
-        # Optional visual snackbar confirmation block indicator layout 
-        self.search_box.hint_text = f"Saved: {track['title'][:20]}..." 
-        self.page.update() 
