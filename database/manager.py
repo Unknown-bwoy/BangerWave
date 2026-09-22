@@ -1,5 +1,6 @@
+# File Name: database/manager.py
 import sqlite3
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 class BangerWaveDatabase:
     """Manages thread-safe SQLite transactions for user playlists and track caching."""
@@ -37,7 +38,7 @@ class BangerWaveDatabase:
                 )
             """)
             
-            # Relational Junction Table mapping tracks to playlists with cascade protection
+            # Relational Junction Table mapping tracks to playlists
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS playlist_tracks (
                     playlist_id INTEGER,
@@ -57,81 +58,40 @@ class BangerWaveDatabase:
                 cursor.execute("INSERT INTO playlists (name) VALUES (?)", (playlist_name.strip(),))
                 return True
         except sqlite3.IntegrityError:
-            return False 
+            return False
 
-
-    def get_all_playlists(self) -> list: 
-        """
-        Queries the database and retrieves all saved custom playlist records.
-        Converts sqlite3.Row elements into clean dictionary models for the UI. 
-        """    
-        try: 
-            with self._get_connection() as conn: 
-                cursor = conn.cursor() 
-                #Fetch all rows from the playlists table  sorted by date created 
-                cursor.execute("SELECT * FROM playlists ORDER BY date_created DESC") 
-                rows = cursor.fetchall() 
-
-                #Turn the SQlite row objects into standard python dictionaries 
-                return [dict(row)  for row in rows] 
-
-        except sqlite3.Error as e: 
-            print(f"[DATABASE ERROR] Playlist retrieval failure: {e}") 
+    def get_all_playlists(self) -> List[Dict[str, Any]]:
+        """Queries the database and retrieves all saved custom playlist records."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM playlists ORDER BY date_created DESC")
+                return [dict(row) for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            print(f"[DATABASE ERROR] Playlist retrieval failure: {e}")
             return []
 
-
-
-
-    def add_track_to_playlist(self,playlist_id: int,track_data:dict) -> bool:
-       """Safely caches song and maps it to a playlist via our junction table. 
-          Prevent table duplication and thread-clapping using single context blocks. 
-       """ 
-       try: 
-           with self._get_connection() as conn: 
-               cursor = conn.cursor() 
-
-               # Step 1:Cache the track metadata safely; ignore if it alreafy exists 
-               cursor.execute("""INSERT OR IGNORE INTO tracks (search_query,name,duration)
-                              VALUES (?,?,?)
-               """, (track_data["query"], track_data["title"],track_data["duration"]))
-
-               # Step 2: Grab the unique primary key ID of that cached  track record 
-               cursor.execute("SELECT id FROM  tracks WHERE search_query = ?",(track_data["query"],)) 
-               row = cursor.fetchone() 
-               if not row: 
-                   return False 
-               track_id = row["id"] 
-
-               # Step 3: Insert the mapping into our composite junction table
-               cursor.execute("""
-                   INSERT OR IGNORE INTO playlist_tracks (playlist_id,track_id)
-                   VALUES (?, ?)
-                 """, (playlist_id, track_id)) 
-               
-                #SQLite auto-commits upon successful exit of this context scope block     
-               print(f"[DATA SUCCESS] Mapped Track ID {track_id} to Playlist ID {playlist_id}") 
-               return True
-       except sqlite3.Error as e:
-            print(f"[DATA ERROR] Relational insertion failure: {e}") 
-            return False   
-
-    def get_playlist_tracks(self, playlist_id:int) -> list: 
-        """Retrieves all permanent cached tracks mapped to a specific playlist ID."""
-        try: 
-            with self._get_connection() as conn: 
-                cursor = conn.cursor() 
-                # Run on timer join query to pull track rows matching our junction mapping 
+    def add_track_to_playlist(self, playlist_id: int, track_data: dict) -> bool:
+        """Safely caches song metadata and maps it to a playlist via our junction table."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
                 cursor.execute("""
-                     SELECT t.id,t.search_query,t.name as title,t.duration 
-                     FROM tracks t  
-                     INNER JOIN playlist_tracks pt ON t.id = pt.track_id 
-                     WHERE pt.playlist_id = ? 
-            """, (playlist_id,)) 
-
-                # Convert the sqlite3.Row elements into clean dictionary models 
-                return [dict(row) for row in cursor.fetchall()] 
-        except sqlite3.Error as e: 
-            print(f"[DATA ERROR] Playlist retrieval query failure: {e}") 
-            return [] 
-
-    
+                    INSERT OR IGNORE INTO tracks (search_query, name, duration)
+                    VALUES (?, ?, ?)
+                """, (track_data["query"], track_data["title"], track_data["duration"]))
+                
+                cursor.execute("SELECT id FROM tracks WHERE search_query = ?", (track_data["query"],))
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                track_id = row["id"]
+                
+                cursor.execute("""
+                    INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id)
+                    VALUES (?, ?)
+                """, (playlist_id, track_id))
+                return True
+        except sqlite3.Error as e:
+            print(f"[DATABASE ERROR] Relational insertion failure: {e}")
+            return False
