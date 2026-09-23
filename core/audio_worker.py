@@ -1,6 +1,6 @@
 # File Name: core/audio_worker.py
-from PySide6.QtCore import QRunnable, QObject, Signal, QThreadPool
-from typing import Optional, Dict, Any
+from PySide6.QtCore import QRunnable, QObject, Signal
+from typing import Any
 import yt_dlp
 
 class WorkerSignals(QObject):
@@ -15,7 +15,7 @@ class AudioScrapeWorker(QRunnable):
         self.query_text = query_text
         self.signals = WorkerSignals()
         
-        self.ydl_opts = {
+        self.ydl_opts: Any = {
             'format': 'bestaudio/best',
             'noplaylist': True,
             'quiet': True,
@@ -29,12 +29,13 @@ class AudioScrapeWorker(QRunnable):
         try:
             with yt_dlp.YoutubeDL(self.ydl_opts) as ydl:
                 info = ydl.extract_info(search_target, download=False)
-                if info and "entries" in info and len(info["entries"]) > 0:
-                    target_entry = info["entries"][0]
+                entries = info.get("entries") if info else None
+                if isinstance(entries, list) and entries:
+                    target_entry = entries[0]
                     resolved_payload = {
                         "id": target_entry.get('id'),
                         "title": target_entry.get('title', 'Unknown Track'),
-                        "duration": float(target_entry.get('duration', 0.0)),
+                        "duration": float(target_entry.get('duration') or 0.0),
                         "url": target_entry.get('url'),
                         "query": self.query_text
                     }
