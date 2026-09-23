@@ -1,6 +1,7 @@
 # File Name: ui/main_window.py
 from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFrame
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtMultimedia import QMediaPlayer,QAudioOutput
+from PySide6.QtCore import  Qt,Slot,QUrl
 from ui.search_view import BangerWaveSearchView
 from ui.player_bar import BangerWavePlayerBar
 
@@ -112,11 +113,7 @@ class BangerWaveMainWindow(QMainWindow):
         # Automatically load active folders upon application launch frame boots
         self.refresh_sidebar_playlists()
 
-    @Slot(dict)
-    def on_track_mutated(self, track_data: dict):
-        """Triggers automatically when the state engine broadcasts an active track change signal."""
-        print(f"[UI REACTION] Top-level Main Window received stream payload: {track_data['title']}")
-
+   
     def refresh_sidebar_playlists(self):
         """Queries SQLite and systematically renders playlist row labels down the sidebar column."""
         # Clean out old widget handles safely
@@ -133,3 +130,74 @@ class BangerWaveMainWindow(QMainWindow):
             folder_button = QPushButton(f" 📁  {folder['name']}")
             folder_button.setStyleSheet("font-size: 13px; font-weight: normal; color: #B3B3B3;")
             self.playlist_container.addWidget(folder_button)
+
+       
+        self.audio_output = QAudioOutput()
+        self.media_player = QMediaPlayer() 
+
+        #Linking player to output channels 
+        self.media_player.setAudioOutput(self.audio_output)  
+        
+       
+        # Sync the core volume threshold straight to the hardware driver layout 
+        self.audio_output.setVolume(self.state.volume) 
+
+        # Connect state modifiers to interactive player methods 
+        self.state.playback_toggled.connect(self.handle_playback_toggle_signal) 
+        self.state.volume_mutated.connect(lambda vol: self.audio_output.setVolume(vol))
+        self.media_player.durationChanged.connect(self.handle_media_duration_changed) 
+        self.media_player.positionChanged.connect(self.handle_media_postion_changed) 
+
+    @Slot(dict) 
+    def on_track_mutated(self, track_data: dict): 
+        """Track mutation slot listener. 
+           Executes terminal tracking telemetry logging and routes direct streaming HTTP CDN link payloads
+           straight down to the QMediaPlayer engine 
+           
+        """
+        print(f"[AUDIO CORE] Loading streaming source token: {track_data['title']}") 
+        print(f"[UI REACTION] Top-level Main window received stream payload: {track_data['title']}") 
+
+       
+        stream_url = track_data.get("url") 
+        if stream_url: 
+            # Set the media source to the unexpired direct streaming CDN URL Link 
+            self.media_player.setSource(QUrl(stream_url))  
+            # Command the audio driver to instantly start streaming the buffer array 
+            self.media_player.play() 
+
+    @Slot(bool) 
+    def handle_playback_toggle_signal(self, should_play: bool): 
+        """Intercepts playback state updates and routes commands straight to the engine"""
+        if should_play: 
+            self.media_player.play() 
+        else: 
+            self.media_player.pause() 
+
+        
+
+    @Slot(int)
+    def handle_media_duration_changed(self,duration_ms: int): 
+        """Fires once when a track loads, establishing the slider's max max boundary""" 
+        # Convert eaw millisecs down to clean seconds for our slider tracking 
+        total_secs = int(duration_ms / 1000) 
+        self.player_bar.timeline_slider.setRange(0, total_secs) 
+
+        #sync the text timestamp on the right side of the bar  
+        m, s = divmod(total_secs,60) 
+        self.player_bar.time_end.setText(f"{m}:{s:02d}") 
+
+    @Slot(int) 
+    def handle_media_postion_changed(self, position_ms: int): 
+        """Fires continuously during active streaming to animate the slider handle """ 
+        current_secs = int(position_ms /  1000) 
+
+        # Block the slider signal to momentarily toa avoid feedback stutter while updating the position 
+        self.player_bar.timeline_slider.blockSignals(True) 
+        self.player_bar.timeline_slider.setValue(current_secs) 
+        self.player_bar.timeline_slider.blockSignals(False) 
+
+        # Sync the running text timer label on left side of the bar 
+        m, s = divmod(current_secs, 60) 
+        self.player_bar.time_start.setText(f"{m}:{s:02d}") 
+        

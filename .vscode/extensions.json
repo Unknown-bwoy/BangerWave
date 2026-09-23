@@ -2,6 +2,7 @@
   "recommendations": [
     "GitHub.copilot-chat",
     "ms-python.python",
-    "ms-python.vscode-pylance"
+    "ms-python.vscode-pylance",
+    "denoland.vscode-deno"
   ]
 }

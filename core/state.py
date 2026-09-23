@@ -27,10 +27,9 @@ class AppState(QObject):
         self.playback_toggled.emit(True)
 
     def set_playing_state(self, playing: bool) -> None:
-        """Toggles the stream state flag layer cleanly."""
-        if self.is_playing != playing:
-            self.is_playing = playing
-            self.playback_toggled.emit(playing)
+        """Toggles the stream state flag layer cleanly and notifies observers."""
+        self.is_playing = playing
+        self.playback_toggled.emit(playing)
 
     def set_volume(self, volume_level: float) -> None:
         """Clamps and synchronizes core audio system boundaries."""
