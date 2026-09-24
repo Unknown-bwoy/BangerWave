@@ -75,7 +75,7 @@ class BangerWaveMainWindow(QMainWindow):
         sidebar_layout.addWidget(brand_title)
         
         search_nav_btn = QPushButton(" 🔍  Search Dashboard") 
-        search_nav_btn.clicked.connect(lambda: self.view_stack.setCurrentIndex(0)) #Snaps viewport card back to search 
+        search_nav_btn.clicked.connect(self.switch_to_search_dashboard) #Snaps viewport card back to search 
         sidebar_layout.addWidget(search_nav_btn)
 
         # Playlist Header Layout block with trailing Creation Action Button 
@@ -159,6 +159,22 @@ class BangerWaveMainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, "Duplicate Folder", "A playlist named that already exists inside your responsitory.")
 
+    def switch_to_search_dashboard(self): 
+        """
+        Forces the view stack back to page 0 and updates layout bounds cleanly. 
+        """
+        self.view_stack.setCurrentIndex(0)
+        self.search_view.update()
+        self.page.update() if self.page else None
+
+    def execute_track_deletion(self, playlist_id: int, track_id: int, playlist_name: str): 
+        """Deletes junction mappings and forces an atomic interface reload loop."""
+        success = self.db.remove_track_from_playlist(playlist_id, track_id) 
+        if success: 
+            print(f"[PURGE SUCCESS] Deleted Track ID {track_id} from Playlist ID {playlist_id}") 
+            # Refresh the viewport panel layout view immediately to show the track ia gone  
+            self.load_playlist_tracks_into_viewport(playlist_id, playlist_name) 
+
     def refresh_sidebar_playlists(self):
         """Queries database and renders directory folder buttons down the left menu column."""
         while self.playlist_container.count():
@@ -202,25 +218,33 @@ class BangerWaveMainWindow(QMainWindow):
                 track_row = QFrame()
                 track_row.setStyleSheet("background-color: #242424; padding:  8px; border-radius: 4px; margin-bottom: 4px;")
                 row_layout = QHBoxLayout(track_row) 
-
+                row_layout.setContentsMargins(11,6,11,6)
+                
                 # Abstract Alignment Sub-Layout Engine
                 lbl_layout = QVBoxLayout()
                 t_lbl = QLabel(track["title"]) 
                 t_lbl.setStyleSheet("font-weight: bold; color: white;") 
                 lbl_layout.addWidget(t_lbl)  
-
                 row_layout.addLayout(lbl_layout,stretch=1) 
 
                 # Concrete Visual Window Widget Component
                 play_btn = QPushButton("▶") 
-                play_btn.setFixedSize(32,32) 
+                play_btn.setFixedSize(32, 32) 
                 play_btn.setStyleSheet("background-color: #1DB954; color:white; border-radius: 15px;") 
                 play_btn.clicked.connect(lambda checked=False, query=track["search_query"]: self.search_view.input_field.setText(query) 
-                                         or self.search_view.trigger_search())
+                                         or self.search_view.trigger_search()) 
+
+                delete_btn = QPushButton("❌")
+                delete_btn.setFixedSize(32, 32)
+                delete_btn.setStyleSheet("QPushButton { color: #A7A7A7; font-size: 11px; } QPushButton:hover { color: #FF5555; }")
+                
+                #Connect click to drop the SQL junction mapping instantly
+                delete_btn.clicked.connect(lambda checked=False,p_id=playlist_id,t_id=track["id"],p_name=playlist_name: self.execute_track_deletion(p_id,t_id,p_name))
   
                 #---> NEST WIDGET: Use .addWidget() for concrete widgets
                 row_layout.addWidget(play_btn) 
-
+                row_layout.addWidget(delete_btn)
+                
                 #Append the complete, self-contained row block wrapper to the playlist frame layout 
                 self.track_list_container.addWidget(track_row) 
 
@@ -243,7 +267,7 @@ class BangerWaveMainWindow(QMainWindow):
         self.state.volume_mutated.connect(lambda vol: self.audio_output.setVolume(vol))
         self.media_player.durationChanged.connect(self.handle_media_duration_changed) 
         self.media_player.positionChanged.connect(self.handle_media_postion_changed) 
-
+     
 
     # //////\\\\\\\\\\\\////\\\\\\Might add new features//////\\\\\\///\\\\\ 
     

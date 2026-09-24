@@ -121,3 +121,22 @@ class BangerWaveDatabase:
         except sqlite3.Error as e: 
             print(f"[DATABASE ERROR] Playlist tracks query failure: {e}")  
             return []   
+
+
+    def remove_track_from_playlist(self, playlist_id: int, track_id: int) -> bool: 
+        """
+        Removes a track association from the junction mapping table via a specific ID.
+        """
+
+        try: 
+            with self._get_connection() as conn: 
+                cursor =  conn.cursor() 
+                cursor.execute(
+                    """DELETE FROM playlist_tracks
+                       WHERE playlist_id = ? AND track_id = ?
+                    """, (playlist_id,track_id)
+                ) 
+
+        except sqlite3.Error as e: 
+            print(f"[DATABASE ERROR] Junction association removal faliure: {e}") 
+            return False
