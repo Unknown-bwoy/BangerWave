@@ -165,7 +165,7 @@ class BangerWaveMainWindow(QMainWindow):
         """
         self.view_stack.setCurrentIndex(0)
         self.search_view.update()
-        self.page.update() if self.page else None
+        self.update()
 
     def execute_track_deletion(self, playlist_id: int, track_id: int, playlist_name: str): 
         """Deletes junction mappings and forces an atomic interface reload loop."""

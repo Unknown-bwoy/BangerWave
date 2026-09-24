@@ -136,7 +136,7 @@ class BangerWaveDatabase:
                        WHERE playlist_id = ? AND track_id = ?
                     """, (playlist_id,track_id)
                 ) 
-
+                return True
         except sqlite3.Error as e: 
             print(f"[DATABASE ERROR] Junction association removal faliure: {e}") 
             return False
