@@ -202,13 +202,31 @@ class BangerWaveMainWindow(QMainWindow):
                 track_row.setStyleSheet("background-color: #242424; padding:  8px; border-radius: 4px; margin-bottom: 4px;")
                 row_layout = QHBoxLayout(track_row) 
 
-
+                # Abstract Alignment Sub-Layout Engine
                 lbl_layout = QVBoxLayout()
                 t_lbl = QLabel(track["title"]) 
                 t_lbl.setStyleSheet("font-weight: bold; color: white;") 
+                lbl_layout.addWidget(t_lbl)  
+
+                row_layout.addLayout(lbl_layout,stretch=1) 
+
+                # Concrete Visual Window Widget Component
+                play_btn = QPushButton("▶") 
+                play_btn.setFixedSize(32,32) 
+                play_btn.setStyleSheet("background-color: #1DB954; color:white; border-radius: 15px;") 
+                play_btn.clicked.connect(lambda checked=False, query=track["search_query"]: self.search_view.input_field.setText(query) 
+                                         or self.search_view.trigger_search())
+  
+                #---> NEST WIDGET: Use .addWidget() for concrete widgets
+                row_layout.addWidget(play_btn) 
+
+                #Append the complete, self-contained row block wrapper to the playlist frame layout 
+                self.track_list_container.addWidget(track_row) 
+
+                # 👑 FLIP CARD: As soon as the loop finishes rendering all track cards, 
+        # this flips the card stack panel index to page 1 (The Playlist Track Viewer Layer).
+                self.view_stack.setCurrentIndex(1)
                 
-
-
         self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer() 
 
