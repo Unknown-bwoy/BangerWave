@@ -1,5 +1,7 @@
 # File Name: ui/main_window.py
-from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QFrame
+from PySide6.QtWidgets import  (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
+                             QLabel, QPushButton, QFrame, 
+                             QStackedWidget, QInputDialog, QMessageBox)
 from PySide6.QtMultimedia import QMediaPlayer,QAudioOutput
 from PySide6.QtCore import  Qt,Slot,QUrl
 from ui.search_view import BangerWaveSearchView
@@ -7,8 +9,9 @@ from ui.player_bar import BangerWavePlayerBar
 
 class BangerWaveMainWindow(QMainWindow):
     """
-    Master Layout Shell for the BangerWave Desktop Client.
-    Implements a Spotify-style multi-pane interface using PySide6 layout managers.
+    Master Structural Layout Shell for BangerWave. 
+    Leverages QStackQWidget to implement fluid page toggling between 
+    the Search Dashboard and active local playlist track listings.
     """
     def __init__(self, state, db):
         super().__init__()
@@ -21,85 +24,111 @@ class BangerWaveMainWindow(QMainWindow):
         
         # 2. Master CSS-Style Sheet (QSS) for a pitch-black music client look
         self.setStyleSheet("""
-            QMainWindow {
-                background-color: #121212;
-            }
-            QLabel {
-                color: #FFFFFF;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            }
-            QFrame#SidebarFrame {
-                background-color: #000000;
-                border-radius: 8px;
-            }
-            QFrame#ViewportFrame {
-                background-color: #181818;
-                border-radius: 8px;
-            }
+            QMainWindow { background-color: #121212; }
+            QLabel { color: #FFFFFF; font-family: 'Segoe UI', Arial, sans-serif; }
+            QFrame#SidebarFrame { background-color: #000000; border-radius: 8px; }
+            QFrame#ViewportFrame { background-color: #181818; border-radius: 8px; }
             QPushButton {
                 background-color: transparent;
                 color: #B3B3B3;
                 border: none;
                 font-weight: bold;
                 text-align: left;
-                padding: 6px;
+                padding: 8px;
+                font-size: 13px;
             }
-            QPushButton:hover {
-                color: #FFFFFF;
+            QPushButton:hover { color: #FFFFFF; }
+            QPushButton#AddPlaylistBtn {
+                color: #1DB954;
+                font-size: 16px;
+                text-align: right;
             }
         """)
 
-        # 3. Assemble the central viewport structural architecture
+        # 3. Initialise Audio Engine pipelines natively in memory registers 
+        self.audio_output = QAudioOutput() 
+        self.media_player = QMediaPlayer()
+        self.media_player.setAudioOutput(self.audio_output)
+        self.audio_output.setVolume(self.state.volume) 
+
+        # 4. Assemble the central viewport structural architecture
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
-        # Top-level layout flows vertically (Workspace on top, player bar locked below)
         master_vertical_layout = QVBoxLayout(central_widget)
-        master_vertical_layout.setContentsMargins(10, 10, 10, 10)
-        master_vertical_layout.setSpacing(10)
+        master_vertical_layout.setContentsMargins(12, 12, 12, 12)
+        master_vertical_layout.setSpacing(12)
         
-        # The core workspace row partition splits the sidebar and content pane horizontally
+       
         workspace_horizontal_layout = QHBoxLayout()
-        workspace_horizontal_layout.setSpacing(10)
+        workspace_horizontal_layout.setSpacing(12)
         
         # ──► A. The Left Sidebar Component Frame
         sidebar_frame = QFrame()
         sidebar_frame.setObjectName("SidebarFrame")
-        sidebar_frame.setFixedWidth(230)
+        sidebar_frame.setFixedWidth(240)
         sidebar_layout = QVBoxLayout(sidebar_frame)
-        sidebar_layout.setContentsMargins(15, 20, 15, 15)
+        sidebar_layout.setContentsMargins(17, 22, 17, 17)
         
         # Sidebar text header titles and button rows
         brand_title = QLabel("BangerWave")
-        brand_title.setStyleSheet("font-size: 20px; font-weight: bold; color: #1DB954; margin-bottom: 15px;")
+        brand_title.setStyleSheet("font-size: 25px; font-weight: bold; color: #1DB954; margin-bottom: 17px;")
         sidebar_layout.addWidget(brand_title)
         
-        search_nav_btn = QPushButton(" 🔍  Search Dashboard")
+        search_nav_btn = QPushButton(" 🔍  Search Dashboard") 
+        search_nav_btn.clicked.connect(lambda: self.view_stack.setCurrentIndex(0)) #Snaps viewport card back to search 
         sidebar_layout.addWidget(search_nav_btn)
+
+        # Playlist Header Layout block with trailing Creation Action Button 
+        playlist_header_row = QHBoxLayout()
+        playlist_header_lbl = QLabel("Your Playlists")
+        playlist_header_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #A7A7A7; text-transform: uppercase;")
         
-        playlist_header = QLabel("Your Playlists")
-        playlist_header.setStyleSheet("font-size: 12px; font-weight: bold; color: #A7A7A7; margin-top: 20px; margin-bottom: 5px;")
-        sidebar_layout.addWidget(playlist_header)
+        add_playlist_btn = QPushButton("➕") 
+        add_playlist_btn.setFixedSize(25,25)
+        add_playlist_btn.clicked.connect(self.trigger_create_playlist_dialog) 
+        add_playlist_btn.setObjectName("AddPlaylistBtn")
+
+        playlist_header_row.addWidget(playlist_header_lbl)
+        playlist_header_row.addWidget(add_playlist_btn) 
+        sidebar_layout.addLayout(playlist_header_row)
         
-        # Concrete placeholder layout box array to map active database playlists later
+        # Concrete variable stack to list folders dynamically
         self.playlist_container = QVBoxLayout()
         sidebar_layout.addLayout(self.playlist_container)
         sidebar_layout.addStretch() # Forces elements to stay tightly packed at the top
+
         
-        # ──► B. The Center Main Viewport Panel Frame
+        # ──► B. Right Central Viewport Page Stack Layer Component
         viewport_frame = QFrame()
         viewport_frame.setObjectName("ViewportFrame")
         viewport_layout = QVBoxLayout(viewport_frame)
-        viewport_layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Instantiate and inject your search component panel straight into the layout manager slot
+        viewport_layout.setContentsMargins(17, 17, 17, 17)
+
+        # MASTER SWITCH STACK: Replaces loose container boxes with card stacks 
+        self.view_stack = QStackedWidget()
+
+        #  Card Index 0: Build and Mount the Main Streaming Search Dashboard View 
         self.search_view = BangerWaveSearchView(self.state, self.db)
-        viewport_layout.addWidget(self.search_view)
+        self.view_stack.addWidget(self.search_view)
         
-        # Add the completed workspace frames to the split horizontal layout panel row
+        # Card Index 1: Create a dedicated dynamic list view frame shell for tracking playlist entries
+        self.playlist_tracks_view = QWidget()
+        self.playlist_tracks_layout = QVBoxLayout(self.playlist_tracks_view)
+        self.playlist_tracks_layout.setContentsMargins(1,1,1,1) 
+        self.playlist_title_lbl = QLabel("Select a Playlist")
+        self.playlist_title_lbl.setStyleSheet("font-size: 23px; font-weight:bold; margin-bottom: 10px;")
+        self.playlist_tracks_layout.addWidget(self.playlist_title_lbl)
+
+
+        # Add an inner tracking column for individual track items rows 
+        self.track_list_container = QVBoxLayout() 
+        self.playlist_tracks_layout.addLayout(self.track_list_container)
+        self.playlist_tracks_layout.addStretch() 
+
+        #Add side-by-side components to the workspace horizontal row container split 
         workspace_horizontal_layout.addWidget(sidebar_frame)
         workspace_horizontal_layout.addWidget(viewport_frame)
-        
+
         # ──► C. The Persistent Bottom Media Console Player Bar
         self.player_bar = BangerWavePlayerBar(self.state)
         
@@ -107,16 +136,30 @@ class BangerWaveMainWindow(QMainWindow):
         master_vertical_layout.addLayout(workspace_horizontal_layout, stretch=1)
         master_vertical_layout.addWidget(self.player_bar)
         
-        # 4. Connect safe reactive signal tracking observers to the UI update slots
-        self.state.track_changed.connect(self.on_track_mutated)
+        # 5. Connect Active Reactive Core Audio Pipeline Observers
+        self.state.track_changed.connect(self.on_track_mutated) 
+        self.state.volume_mutated.connect(lambda vol: self.audio_output.setVolume(vol))
+        self.state.playback_toggled.connect(self.handle_playback_toggle_signal) 
+
+        # Connect hardware timeless clock loops 
+        self.media_player.durationChanged.connect(self.handle_media_duration_changed)
+        self.media_player.positionChanged.connect(self.handle_media_postion_changed)
         
-        # Automatically load active folders upon application launch frame boots
+        # Map folders into layout rows at startup
         self.refresh_sidebar_playlists()
 
-   
+    def trigger_create_playlist_dialog(self): 
+        """Spawns a clean native desktop string input window overlay box to store custom playlist entries."""
+        text,ok = QInputDialog.getText(self, "Create Playlists", "Enter a name for your fresh playlist:")
+        if ok  and  text.strip(): 
+            success = self.db.create_playlist(text.strip())
+            if success: 
+                self.refresh_sidebar_playlists()
+            else:
+                QMessageBox.warning(self, "Duplicate Folder", "A playlist named that already exists inside your responsitory.")
+
     def refresh_sidebar_playlists(self):
-        """Queries SQLite and systematically renders playlist row labels down the sidebar column."""
-        # Clean out old widget handles safely
+        """Queries database and renders directory folder buttons down the left menu column."""
         while self.playlist_container.count():
             item = self.playlist_container.takeAt(0)
             if item is not None:  
@@ -128,10 +171,44 @@ class BangerWaveMainWindow(QMainWindow):
         folders = self.db.get_all_playlists()
         for folder in folders:
             folder_button = QPushButton(f" 📁  {folder['name']}")
-            folder_button.setStyleSheet("font-size: 13px; font-weight: normal; color: #B3B3B3;")
+            folder_button.setStyleSheet("font-size: 15px; font-weight: normal; color: #B3B3B3;")
+            folder_button.clicked.connect(lambda checked=False, f_id=folder["id"], f_name=folder["name"]: self.load_playlist_tracks_into_viewport(f_id, f_name)) 
             self.playlist_container.addWidget(folder_button)
 
-       
+    def load_playlist_tracks_into_viewport(self, playlist_id: int, playlist_name: str): 
+        """Fetches track from SQLite matching the requested index and flips the central card view layout.""" 
+        # Update your page headers text properties 
+        self.playlist_title_lbl.setText(f" 📁 {playlist_name}") 
+
+        # Clear previous rows from inner layout container 
+        while self.track_list_container.count(): 
+            item = self.track_list_container.takeAt(0)
+            if item is not None: 
+                widget = item.widget()
+                if widget is not None: 
+                    widget.deleteLater() 
+
+
+        # Pull relational track tables  rows straight out of SQLite  
+        tracks = self.db.get_playlist_tracks(playlist_id) 
+        if not tracks: 
+            empty_lbl = QLabel("This playlist folder is not empty. Search for music and add songs here!")
+            empty_lbl.setStyleSheet("color: #A7A7A7; font-style: italic;")
+            self.track_list_container.addWidget(empty_lbl)
+
+        else: 
+            for track in tracks: 
+                track_row = QFrame()
+                track_row.setStyleSheet("background-color: #242424; padding:  8px; border-radius: 4px; margin-bottom: 4px;")
+                row_layout = QHBoxLayout(track_row) 
+
+
+                lbl_layout = QVBoxLayout()
+                t_lbl = QLabel(track["title"]) 
+                t_lbl.setStyleSheet("font-weight: bold; color: white;") 
+                
+
+
         self.audio_output = QAudioOutput()
         self.media_player = QMediaPlayer() 
 
