@@ -95,3 +95,29 @@ class BangerWaveDatabase:
         except sqlite3.Error as e:
             print(f"[DATABASE ERROR] Relational insertion failure: {e}")
             return False
+
+    def get_playlist_tracks(self, playlist_id: int) -> list: 
+        """
+        Retrieves all permanently cached tracks mapped to a specific playlists ID.
+        Uses an INNER JOIN across the junction table to reconstruct the track list models. 
+         """     
+
+        try: 
+
+            with self._get_connection() as conn: 
+                cursor = conn.cursor() 
+                # Run an inner join query to extract track rows matching our mapping  
+                cursor.execute("""
+                     SELECT t.id, t.search_query,t.name as title , t.duration
+                     FROM tracks t 
+                     INNER JOIN playlist_tracks pt ON t.id = pt.track_id
+                     WHERE pt.playlist_id = ?                
+                """,(playlist_id,)) 
+
+                #Convert the sqlite3.Row elements into clean dictionary objects for the UI 
+
+                return [dict(row) for  row in cursor.fetchall()] 
+        
+        except sqlite3.Error as e: 
+            print(f"[DATABASE ERROR] Playlist tracks query failure: {e}")  
+            return []   

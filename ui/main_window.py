@@ -144,6 +144,7 @@ class BangerWaveMainWindow(QMainWindow):
         # Connect hardware timeless clock loops 
         self.media_player.durationChanged.connect(self.handle_media_duration_changed)
         self.media_player.positionChanged.connect(self.handle_media_postion_changed)
+        self.player_bar.timeline_slider.sliderMoved.connect(self.handle_user_timeline_scrub)
         
         # Map folders into layout rows at startup
         self.refresh_sidebar_playlists()
@@ -242,6 +243,23 @@ class BangerWaveMainWindow(QMainWindow):
         self.state.volume_mutated.connect(lambda vol: self.audio_output.setVolume(vol))
         self.media_player.durationChanged.connect(self.handle_media_duration_changed) 
         self.media_player.positionChanged.connect(self.handle_media_postion_changed) 
+
+
+    # //////\\\\\\\\\\\\////\\\\\\Might add new features//////\\\\\\///\\\\\ 
+    
+    @Slot(int) 
+    def handle_user_timeline_scrub(self, requested_seconds: int): 
+        """
+        Fires when the user manually drags or click the playback slider handle.
+        """ 
+        #Convert secs back into millisecs for the core hardware audio layer 
+        target_ms = requested_seconds * 1000
+
+        #Explicitly instruct the player engine to jump directly to that track position 
+        self.media_player.setPosition(target_ms)
+        print(f"[AUDIO CORE] Seeking timeline forward to: {requested_seconds}s")
+
+
 
     @Slot(dict) 
     def on_track_mutated(self, track_data: dict): 
